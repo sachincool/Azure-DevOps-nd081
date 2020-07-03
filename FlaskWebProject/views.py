@@ -80,13 +80,17 @@ def login():
 @app.route(Config.REDIRECT_PATH)  # Its absolute URL must match your app's redirect_uri set in AAD
 def authorized():
     if request.args.get('state') != session.get("state"):
-        return redirect(url_for("home"))  # No-OP. Goes back to Index page
+            return redirect(url_for("home"))  # No-OP. Goes back to Index page
     if "error" in request.args:  # Authentication/Authorization failure
+        # app.logger.info('%s failed to log in using microsoft account', user.username)
         return render_template("auth_error.html", result=request.args)
     if request.args.get('code'):
         cache = _load_cache()
-        # TODO: Acquire a token from a built msal app, along with the appropriate redirect URI
-        result = None
+        # Acquire a token from a built msal app, along with the appropriate redirect URI
+        result = _build_msal_app(cache=cache).acquire_token_by_authorization_code(
+            request.args['code'],
+            scopes=app.config['SCOPE'],  # Misspelled scope would cause an HTTP 400 error here
+            redirect_uri=url_for("authorized", _external=True))
         if "error" in result:
             return render_template("auth_error.html", result=result)
         session["user"] = result.get("id_token_claims")
@@ -95,6 +99,7 @@ def authorized():
         user = User.query.filter_by(username="admin").first()
         login_user(user)
         _save_cache(cache)
+        # app.logger.info('%s logged in successfully', user.username)
     return redirect(url_for('home'))
 
 @app.route('/logout')
@@ -126,7 +131,6 @@ def _build_msal_app(cache=None, authority=None):
     client_credential=app.config['CLIENT_SECRET'], token_cache=cache)
 
 def _build_auth_url(authority=None, scopes=None, state=None):
-    # TODO: Return the full Auth Request URL with appropriate Redirect URI
     return _build_msal_app(authority=authority).get_authorization_request_url(
      scopes or [],
         state=state or str(uuid.uuid4()),
