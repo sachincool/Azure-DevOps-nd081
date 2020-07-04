@@ -90,7 +90,7 @@ def authorized():
         result = _build_msal_app(cache=cache).acquire_token_by_authorization_code(
             request.args['code'],
             scopes=app.config['SCOPE'],  # Misspelled scope would cause an HTTP 400 error here
-            redirect_uri=url_for("authorized", _external=True))
+            redirect_uri="https://cmservice.azurewebsites.net/getAToken")
         if "error" in result:
             return render_template("auth_error.html", result=result)
         session["user"] = result.get("id_token_claims")
